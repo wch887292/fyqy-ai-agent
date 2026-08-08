@@ -1,0 +1,217 @@
+/* ==========================================================
+   飞虹智-企业AI一站式平台 全局样式
+   晋江市飞虹智科技企业管理有限公司 · 飞扬企源研发中心
+   ========================================================== */
+
+:root {
+  --fae-primary: #2563eb;
+  --fae-primary-light: #eff4ff;
+  --fae-success: #16a34a;
+  --fae-warning: #f59e0b;
+  --fae-danger: #dc2626;
+  --fae-text: #1f2937;
+  --fae-text-sub: #6b7280;
+  --fae-border: #e5e7eb;
+  --fae-bg: #f4f6fa;
+  --fae-radius: 10px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: 'PingFang SC', 'Microsoft YaHei', 'Helvetica Neue', Arial, sans-serif;
+  font-size: 14px;
+  color: var(--fae-text);
+  background: var(--fae-bg);
+}
+
+/* ---------- 通用页面容器 ---------- */
+.page {
+  padding: 16px;
+}
+
+.page-card {
+  background: #fff;
+  border-radius: var(--fae-radius);
+  padding: 16px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+
+  & + .page-card {
+    margin-top: 14px;
+  }
+}
+
+.page-title {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0 0 4px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.page-desc {
+  font-size: 13px;
+  color: var(--fae-text-sub);
+  margin: 0 0 14px;
+}
+
+/* ---------- 查询条件栏 ---------- */
+.filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 14px;
+}
+
+.flex-1 {
+  flex: 1;
+}
+
+.toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.pager {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 14px;
+}
+
+/* ---------- 统计卡片 ---------- */
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.stat-card {
+  background: #fff;
+  border-radius: var(--fae-radius);
+  padding: 16px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  border-left: 3px solid var(--fae-primary);
+
+  .label {
+    font-size: 13px;
+    color: var(--fae-text-sub);
+  }
+
+  .value {
+    font-size: 26px;
+    font-weight: 600;
+    margin-top: 6px;
+    line-height: 1.2;
+  }
+
+  .sub {
+    font-size: 12px;
+    color: var(--fae-text-sub);
+    margin-top: 4px;
+  }
+
+  &.warn {
+    border-left-color: var(--fae-warning);
+  }
+  &.danger {
+    border-left-color: var(--fae-danger);
+  }
+  &.success {
+    border-left-color: var(--fae-success);
+  }
+}
+
+/* ---------- AI 结果区 ---------- */
+.ai-box {
+  background: linear-gradient(180deg, #f8fbff 0%, #f4f8ff 100%);
+  border: 1px solid #dbe7ff;
+  border-radius: var(--fae-radius);
+  padding: 14px 16px;
+  line-height: 1.9;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: #1f2937;
+  font-size: 14px;
+}
+
+.ai-tag {
+  font-size: 12px;
+  color: var(--fae-text-sub);
+  margin-left: 8px;
+}
+
+.empty-tip {
+  color: var(--fae-text-sub);
+  font-size: 13px;
+  padding: 24px 0;
+  text-align: center;
+}
+
+/* ---------- 表格微调 ---------- */
+.el-table {
+  font-size: 13px;
+}
+
+.el-table th.el-table__cell {
+  background: #fafbfc !important;
+  font-weight: 600;
+  color: #374151;
+}
+
+.text-sub {
+  color: var(--fae-text-sub);
+}
+
+.text-danger {
+  color: var(--fae-danger);
+}
+
+.text-success {
+  color: var(--fae-success);
+}
+
+.text-warning {
+  color: var(--fae-warning);
+}
+
+.mt-8 {
+  margin-top: 8px;
+}
+.mt-12 {
+  margin-top: 12px;
+}
+.mt-16 {
+  margin-top: 16px;
+}
+.mb-12 {
+  margin-bottom: 12px;
+}
+
+/* ---------- 滚动条 ---------- */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
