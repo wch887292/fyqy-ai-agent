@@ -8,7 +8,11 @@ import { BadRequestException } from '@nestjs/common';
  * 「no such column: NaN」的 500，既不友好也暴露了内部错误。
  * 这里统一收敛为 400 业务异常。
  */
-export function parseIntId(value: any, label = 'ID'): number {
+export function parseIntId(value: any, label = 'ID', optional = false): number {
+  // optional=true 用于「新增/编辑」二合一接口：id 缺省表示新增，返回 0 而不是抛错
+  if (optional && (value === undefined || value === null || value === '' || Number(value) === 0)) {
+    return 0;
+  }
   const n = Number(value);
   if (!Number.isInteger(n) || n <= 0) {
     throw new BadRequestException(`${label}无效`);

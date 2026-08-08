@@ -1,10 +1,10 @@
-# 飞虹智 · 企业AI一站式平台 V1.0
+# 飞虹智 · 企业AI一站式平台 V2.0
 
 > 面向中小制造企业的 AI 原生一体化管理平台
 > 研发主体：**晋江市飞虹智科技企业管理有限公司 · 飞扬企源研发中心**
 > 项目负责人：**吴赐虹**
 
-一套开箱即用的企业级 SaaS 平台，覆盖 **AI 工作台、组织管理、AI 知识库、AI 销售 CRM、AI-ERP 进销存、合伙人管理、系统设置** 七大模块，内置多租户隔离、三级数据权限与 AI 能力中间层。
+一套开箱即用的企业级 SaaS 平台，覆盖 **AI 工作台、组织管理、AI 知识库、AI 销售 CRM、AI-ERP 进销存、合伙人管理、简易生产管理、OpenClaw 智能体自动化引擎、站内消息、批量导入导出** 十大能力，内置多租户隔离、三级数据权限与 AI 能力中间层。
 
 ---
 
@@ -105,10 +105,14 @@ llm.completeJson({ scene, enterpriseId, prompt, payload })
 |---|---|---|
 | AI 工作台 | 首页、AI 助手 | 经营概览、四类待办、近 7 日趋势图、AI 经营简报、全局对话助手 |
 | 组织管理 | 部门、员工、角色、合伙人 | 部门树、员工管理、角色权限矩阵、数据范围配置 |
-| AI 知识库 | 文档管理、上传、智能问答 | 文档向量化、语义检索、带引用来源的 AI 问答 |
-| AI 销售 CRM | 客户、公海、跟进、日报、统计 | AI 意向评分分级、公海流转、跟进提醒、AI 一键生成日报 |
-| AI-ERP | 产品、库存、订单、经营日报 | 出入库、库存预警、订单状态流转、AI 经营日报 |
-| 合伙人管理 | 分润配置、业绩、风险 | 分润规则、业绩核算、AI 风险扫描 |
+| AI 知识库 | 文档管理、上传、智能问答 | 文档向量化、语义检索、带引用来源的 AI 问答；**V2.0 新增：版本快照 / 历史回滚 / 会话历史** |
+| AI 销售 CRM | 客户、公海、跟进、日报、统计 | AI 意向评分分级、公海流转、跟进提醒、AI 一键生成日报；**V2.0 新增：批量导入客户 / 导出 Excel** |
+| AI-ERP | 产品、库存、订单、经营日报 | 出入库、库存预警、订单状态流转、AI 经营日报；**V2.0 新增：导出 Excel** |
+| 合伙人管理 | 分润配置、业绩、风险、**分利规则**、**结算流水** | 分润规则、业绩核算、AI 风险扫描；**V2.0 新增：按订单 / 按业绩全自动分利核算、结算流水台账、对账单导出** |
+| 简易生产管理（V2.0） | 生产工单 | 待排产 / 生产中 / 完工 / 入库闭环；AI 工期与缺料提示；订单事件自动派单 |
+| OpenClaw 智能体引擎（V2.0） | 智能体任务、执行日志 | 4 套开箱模板、定时 / 事件双触发、手动立即执行、完整执行日志 |
+| 站内消息（V2.0） | 消息中心 | 智能体 / 工单 / 风险 / 分利统一投递，右上角铃铛角标 |
+| 批量导入导出（V2.0） | 客户导入模板 | 客户 Excel 批量导入、订单 / 工单导出、知识库文档批量上传 |
 | 系统设置 | 企业信息、AI 配置、操作日志 | 企业资料、大模型连通性测试、全量操作留痕 |
 
 ---
@@ -117,27 +121,29 @@ llm.completeJson({ scene, enterpriseId, prompt, payload })
 
 ```
 fae-platform/
-├── backend/                    NestJS 后端（55 个 TS 文件，约 8500 行）
+├── backend/                    NestJS 后端（约 65 个 TS 文件，约 10000 行）
 │   ├── src/
-│   │   ├── common/             鉴权装饰器、数据权限、统一响应
+│   │   ├── common/             鉴权装饰器、数据权限、统一响应、ID 解析、事件总线、cron
 │   │   ├── config/             配置中心，双环境开关
-│   │   ├── entities/           7 组实体定义
+│   │   ├── entities/           12 组实体定义（含 V2.0 新增 agent / prod / notice / settle / kb 版本）
 │   │   ├── infra/              LLM / 向量库 / 存储三大基础设施抽象
-│   │   └── modules/            auth org kb crm erp partner system workbench ai seed
+│   │   └── modules/            auth org kb crm erp partner system workbench ai seed + agent prod notice common
+│   ├── scripts/                冒烟测试（smoke.py / smoke-v2.py / perm-regression.py）
 │   ├── Dockerfile
 │   └── .env.example
-├── frontend/                   Vue3 前端（30 个组件，约 11000 行）
+├── frontend/                   Vue3 前端（33 个组件，约 12000 行）
 │   ├── src/
-│   │   ├── api/                97 个接口封装，统一解包与 401 跳转
+│   │   ├── api/                125+ 接口封装，统一解包与 401 跳转
 │   │   ├── components/         全局 AI 助手抽屉
-│   │   ├── layout/             主布局，菜单由后端权限驱动
+│   │   ├── layout/             主布局，菜单由后端权限驱动，右上角铃铛角标（V2.0）
 │   │   ├── router/             路由与权限守卫
 │   │   ├── store/              Pinia 用户状态
-│   │   └── views/              7 大模块共 25 个业务页面
+│   │   └── views/              9 大模块共 33 个业务页面
 │   ├── Dockerfile
 │   └── nginx.conf
 ├── deploy/
-│   ├── init.sql                MySQL 建表与基础字典
+│   ├── init.sql                MySQL 建表与基础字典（V1.0）
+│   ├── v2_alter.sql            V2.0 增量 DDL（幂等，重复执行安全）
 │   ├── start.sh / start.bat    一键部署
 │   └── stop.sh                 停止与清理
 ├── docker-compose.yml          MySQL + MinIO + etcd + Milvus + 前后端
@@ -154,7 +160,7 @@ fae-platform/
 - 客户列表固定每页 10 条（产品硬规则，由 `CRM_PAGE_SIZE` 控制）。
 - 客户 `contact_time` 一律取服务端实时时间，忽略前端传值。
 
-当前后端共 **97 个路由**，前端 **95 个接口调用全部命中**，无孤儿接口。
+当前后端共 **125+ 个路由**（V1.0 的 97 + V2.0 新增 28），前端 **125+ 个接口调用全部命中**，无孤儿接口。
 
 ---
 
@@ -187,6 +193,67 @@ fae-platform/
 - [ ] 关闭 MySQL / MinIO / Milvus 的对外端口映射，仅保留前端入口
 - [ ] 前端入口配置 HTTPS 证书
 - [ ] 配置数据卷定期备份
+
+---
+
+## 十、V1.0 → V2.0 升级指南
+
+适用于已将 V1.0 部署至生产环境、需要平滑升级至 V2.0 的企业。升级全程幂等，**数据零风险**，可在业务运行期间完成。
+
+### 1. 前置检查
+
+```bash
+# 确认当前版本（后端启动日志应显示「飞虹智-企业AI一站式平台 V1.x」）
+cat backend/src/main.ts | head -20
+
+# 备份当前数据库（SQLite 或 MySQL）
+cp backend/data/fae_enterprise.db fae_enterprise.db.bak  # SQLite
+mysqldump -u root -p fae_enterprise > fae_enterprise_v1.sql  # MySQL
+```
+
+### 2. 执行 DDL 增量脚本
+
+```bash
+# SQLite（dev / 轻量生产）
+sqlite3 backend/data/fae_enterprise.db < deploy/v2_alter.sql
+
+# MySQL（正式生产）
+mysql -u root -p fae_enterprise < deploy/v2_alter.sql
+```
+
+> `v2_alter.sql` 全部使用 `CREATE TABLE IF NOT EXISTS` / `ALTER TABLE ... ADD COLUMN IF NOT EXISTS`，**重复执行安全**，生产环境无需先清空。
+
+### 3. 代码与镜像更新
+
+```bash
+# 后端重新构建并重启（Docker 环境）
+docker compose up -d --build backend
+# 或本地开发
+npm run build && npm run start
+```
+
+### 4. 菜单权限自动升级
+
+后端 `SeedService.upgradeMenuCodes()` 会在首次启动时**自动且幂等**地将 V2.0 菜单代码追加到 `super_admin` / `ent_admin` 角色：
+
+| 角色 | 新增菜单代码 |
+|---|---|
+| `super_admin` | `agent:task`, `agent:log`, `prod:workorder`, `partner:rule`, `partner:settle`, `notice:index` |
+| `ent_admin` | 同 `super_admin` |
+
+> 若发现菜单未显示，手动在「角色管理」中勾选对应菜单代码后重新登录即可，该操作幂等。
+
+### 5. 验证升级结果
+
+访问 `http://<服务器IP>:8000`，登录后确认：
+
+- [ ] 左侧菜单出现「智能体引擎」「生产工单」「分利规则」「结算流水」「消息中心」
+- [ ] 右上角铃铛图标显示未读消息数（若有）
+- [ ] 知识库文档详情页右上角有「历史版本」按钮
+
+### 6. 回滚方案
+
+如需退回 V1.0（极端情况），保留 `fae_enterprise.db.bak` 或 `fae_enterprise_v1.sql`，覆盖原库并重启旧版镜像即可。**V2.0 新增表不影响 V1.0 功能**，回滚后 V2.0 功能自然降级为不可见。
 
 ---
 

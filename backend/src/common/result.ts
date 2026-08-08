@@ -33,6 +33,33 @@ export const pageResult = <T>(list: T[], total: number, page: number, size: numb
   pages: size > 0 ? Math.ceil(total / size) : 0,
 });
 
+/**
+ * 实体 -> 出参序列化：把 camelCase 属性名转成项目统一的 snake_case 出参风格。
+ *
+ * 背景：V1.0 各服务是逐字段手写 { user_id: r.userId } 映射，前端全量按 snake_case 读取。
+ * V2.0 新增模块若直接把 TypeORM 实体丢给前端，字段名会变成 camelCase 导致前端读空，
+ * 因此新增接口统一走这里，既保持出参风格一致，又不必逐字段手抄。
+ *
+ * 注意：只转换对象的「键名」，Date / Buffer / 数组元素的值原样保留。
+ */
+export function toSnake<T = any>(input: any): T {
+  if (input === null || input === undefined) return input;
+  if (Array.isArray(input)) return input.map((i) => toSnake(i)) as any;
+  if (input instanceof Date || Buffer.isBuffer(input)) return input as any;
+  if (typeof input !== 'object') return input;
+
+  const out: any = {};
+  for (const [k, v] of Object.entries(input)) {
+    const key = k.replace(/([a-z0-9])([A-Z])/g, '$1_$2').toLowerCase();
+    out[key] = toSnake(v);
+  }
+  return out;
+}
+
+/** 分页 + snake_case 出参（V2.0 新增模块统一使用） */
+export const snakePage = <T>(list: T[], total: number, page: number, size: number) =>
+  pageResult(toSnake<any[]>(list), total, page, size);
+
 /** 业务错误码 */
 export enum BizCode {
   SUCCESS = 0,

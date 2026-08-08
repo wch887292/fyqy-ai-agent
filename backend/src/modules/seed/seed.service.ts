@@ -20,7 +20,7 @@ import {
   SysUser,
 } from '../../entities';
 import { bizNo } from '../../common/scope';
-import { ALL_MENU_CODES } from '../../common/menus';
+import { ALL_MENU_CODES, PARTNER_MENU_CODES } from '../../common/menus';
 import { OrgService } from '../org/org.service';
 import { AiService } from '../ai/ai.service';
 import {
@@ -71,6 +71,8 @@ export class SeedService implements OnApplicationBootstrap {
       const count = await this.entRepo.count();
       if (count > 0) {
         this.logger.log('检测到已有企业数据，跳过初始化');
+        // V1.0 -> V2.0 平滑升级：老库里的角色没有 V2.0 菜单码，这里幂等补齐
+        await this.upgradeMenuCodes();
         return;
       }
 
@@ -99,6 +101,45 @@ export class SeedService implements OnApplicationBootstrap {
     } catch (e: any) {
       // 初始化失败不能拖垮服务，打日志让运维介入即可
       this.logger.error(`数据初始化失败：${e.message}`);
+    }
+  }
+
+  /**
+   * V1.0 -> V2.0 菜单权限平滑升级（幂等）
+   *
+   * 老库里 super_admin / ent_admin 的 menu_codes 是 V1.0 时的快照，
+   * 升级后不会自动包含 agent / prod / partner:rule / partner:settle 等新码，
+   * 会导致管理员打不开新模块。这里按角色补齐，只做并集不做删除，
+   * 不覆盖客户自定义角色的授权范围。
+   */
+  private async upgradeMenuCodes() {
+    const roles = await this.roleRepo.find();
+    let changed = 0;
+    for (const role of roles) {
+      const own = new Set(
+        String(role.menuCodes || '')
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean),
+      );
+      const before = own.size;
+
+      if (role.roleCode === 'super_admin' || role.roleCode === 'ent_admin') {
+        ALL_MENU_CODES.forEach((c) => own.add(c));
+      } else if (role.roleCode === 'partner') {
+        PARTNER_MENU_CODES.forEach((c) => own.add(c));
+      } else {
+        continue; // 自定义角色 / 部门管理员 / 普通员工由企业自行授权，不擅自扩权
+      }
+
+      if (own.size !== before) {
+        role.menuCodes = [...own].join(',');
+        await this.roleRepo.save(role);
+        changed++;
+      }
+    }
+    if (changed) {
+      this.logger.log(`V2.0 菜单权限升级完成：${changed} 个内置角色已补齐新增菜单码`);
     }
   }
 

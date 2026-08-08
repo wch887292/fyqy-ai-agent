@@ -37,7 +37,7 @@ async function bootstrap() {
   const llm = config.get('llm');
 
   logger.log('='.repeat(72));
-  logger.log(`  ${config.get('appName')} V1.0`);
+  logger.log(`  ${config.get('appName')} V2.0`);
   logger.log('  晋江市飞虹智科技企业管理有限公司 · 飞扬企源研发中心');
   logger.log('-'.repeat(72));
   logger.log(`  运行模式   : ${mode}`);
@@ -46,6 +46,8 @@ async function bootstrap() {
   logger.log(`  向量库     : ${vec.driver}`);
   logger.log(`  文件存储   : ${sto.driver}`);
   logger.log(`  大模型     : ${llm.endpoint ? `OpenClaw ${llm.endpoint}` : '未配置（自动降级为规则引擎，功能可完整演示）'}`);
+  logger.log(`  智能体调度 : 已启用（每分钟扫描 cron 任务 + 订单事件触发）`);
+  logger.log(`  V2.0 新增  : 智能体引擎 / 合伙人自动分利 / 生产工单 / 站内消息 / 批量导入导出`);
   logger.log('='.repeat(72));
 }
 

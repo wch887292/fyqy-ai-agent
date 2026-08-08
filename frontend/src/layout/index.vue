@@ -66,6 +66,21 @@
             AI助手
           </el-button>
 
+          <!-- V2.0 站内消息铃铛：全局可见，无需菜单权限 -->
+          <el-badge
+            :value="unreadBadge > 0 ? unreadBadge : ''"
+            :max="99"
+            class="notice-badge"
+            :hidden="!store.token"
+          >
+            <el-button
+              link
+              :icon="Bell"
+              @click="router.push('/notice/index')"
+              :title="`消息中心（${unreadBadge} 未读）`"
+            />
+          </el-badge>
+
           <el-dropdown @command="onCommand">
             <span class="user-chip">
               <el-avatar :size="28" class="avatar">{{ avatarText }}</el-avatar>
@@ -122,9 +137,9 @@
 import { computed, onMounted, reactive, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { ElMessage, ElMessageBox } from 'element-plus';
-import { ArrowDown, ChatDotRound } from '@element-plus/icons-vue';
+import { ArrowDown, Bell, ChatDotRound } from '@element-plus/icons-vue';
 import { useUserStore } from '../store/user';
-import { systemApi, userApi } from '../api';
+import { systemApi, userApi, noticeApi } from '../api';
 import AiAssistant from '../components/AiAssistant.vue';
 
 const route = useRoute();
@@ -145,6 +160,12 @@ const avatarText = computed(() => (store.realName || 'U').slice(0, 1));
 /** 是否具备「企业AI助手」权限，未授权时不渲染入口，避免调用被后端守卫拦截 */
 const canUseAssistant = computed(() => store.has('workbench:assistant'));
 
+/** V2.0 站内消息未读角标：懒加载，仅拉一次后静默，避免首屏阻塞 */
+const unreadBadge = ref(0);
+function fetchUnreadBadge() {
+  noticeApi.unreadCount().then((n: any) => { unreadBadge.value = Number(n ?? 0); }).catch(() => void 0);
+}
+
 onMounted(async () => {
   try {
     const info: any = await systemApi.info();
@@ -152,6 +173,8 @@ onMounted(async () => {
   } catch {
     llmReady.value = null;
   }
+  // V2.0 消息角标
+  fetchUnreadBadge();
 });
 
 /* ---------- 修改密码 ---------- */

@@ -60,6 +60,41 @@ export class PartnerController {
 
   // ---------- 分利 ----------
 
+  /** POST /api/v1/partner/rule/save 分利规则保存 */
+  @Post('rule/save')
+  @RequireMenu('partner:rule')
+  ruleSave(@TenantId() entId: number, @Body() body: any) {
+    return this.svc.ruleSave(entId, body);
+  }
+
+  /** GET /api/v1/partner/rule/page 分利规则分页 */
+  @Get('rule/page')
+  @RequireMenu('partner:rule')
+  rulePage(@TenantId() entId: number, @Query() query: any) {
+    return this.svc.rulePage(entId, query);
+  }
+
+  /** GET /api/v1/partner/settle/page 结算流水分页 */
+  @Get('settle/page')
+  @RequireMenu('partner:settle')
+  settlePage(@TenantId() entId: number, @CurrentUser() user: AuthUser, @Query() query: any) {
+    return this.svc.settlePage(entId, user, query);
+  }
+
+  /** POST /api/v1/partner/settle/manual 手动标记结算完成 */
+  @Post('settle/manual')
+  @RequireMenu('partner:settle')
+  settleManual(@TenantId() entId: number, @CurrentUser() user: AuthUser, @Body() body: any) {
+    return this.svc.settleManual(entId, user, body);
+  }
+
+  /** GET /api/v1/partner/settle/export 导出对账单 */
+  @Get('settle/export')
+  @RequireMenu('partner:settle')
+  settleExport(@TenantId() entId: number, @CurrentUser() user: AuthUser, @Query() query: any) {
+    return this.svc.settleExportRows(entId, user, query);
+  }
+
   /** POST /api/v1/partner/performance/save 业绩归属台账新增 */
   @Post('performance/save')
   @RequireMenu('partner:performance')

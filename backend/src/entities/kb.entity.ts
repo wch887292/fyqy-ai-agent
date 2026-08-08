@@ -120,3 +120,39 @@ export class KbChatHistory {
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 }
+
+/** 文档历史版本（V2.0 知识库版本管理） */
+@Entity('kb_doc_version')
+@Index('idx_ver_ent_doc', ['enterpriseId', 'docId'])
+export class KbDocVersion {
+  @PrimaryGeneratedColumn({ type: T.pk })
+  id: number;
+
+  @Column({ name: 'enterprise_id', ...bigintCol(false) })
+  enterpriseId: number;
+
+  @Column({ name: 'doc_id', ...bigintCol(false) })
+  docId: number;
+
+  /** 版本号，从 1 开始递增 */
+  @Column({ name: 'version_no', type: 'int', default: 1 })
+  versionNo: number;
+
+  @Column({ length: 255 })
+  title: string;
+
+  @Column({ type: T.longtext, nullable: true })
+  content: string;
+
+  @Column({ type: T.text, nullable: true })
+  summary: string;
+
+  @Column({ name: 'tag_list', length: 512, nullable: true })
+  tagList: string;
+
+  @Column({ name: 'created_by', ...bigintCol() })
+  createdBy: number;
+
+  @CreateDateColumn({ name: 'created_at' })
+  createdAt: Date;
+}

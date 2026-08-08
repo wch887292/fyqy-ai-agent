@@ -85,11 +85,43 @@
         </div>
       </div>
 
-      <div class="page-card">
-        <h3 class="page-title">推荐问题</h3>
-        <p class="page-desc">点击直接提问</p>
-        <div v-for="q in suggestions" :key="q" class="sug" @click="send(q)">{{ q }}</div>
-      </div>
+      <el-tabs v-model="sideTab" class="side-tabs">
+        <el-tab-pane label="推荐问题" name="sug">
+          <div class="page-card" style="margin-top:0">
+            <p class="page-desc">点击直接提问</p>
+            <div v-for="q in suggestions" :key="q" class="sug" @click="send(q)">{{ q }}</div>
+          </div>
+        </el-tab-pane>
+        <el-tab-pane label="会话历史" name="hist">
+          <div class="page-card" style="margin-top:0; padding:0">
+            <div v-loading="histLoading" class="hist-list">
+              <div v-if="!histList.length" class="empty-tip" style="padding:20px 0">暂无历史会话</div>
+              <div
+                v-for="h in histList"
+                :key="h.id"
+                class="hist-item"
+                @click="restoreSession(h)"
+                :title="h.question"
+              >
+                <div class="hist-q" :class="{ bold: !h._read }">{{ h.question }}</div>
+                <div class="hist-time text-sub tiny">{{ fmt(h.created_at) }}</div>
+              </div>
+            </div>
+            <div class="hist-pager">
+              <el-pagination
+                v-model:current-page="histPage"
+                v-model:page-size="histSize"
+                :total="histTotal"
+                :page-sizes="[10, 20]"
+                layout="total, prev, pager, next"
+                small
+                @current-change="loadHistory"
+                @size-change="loadHistory"
+              />
+            </div>
+          </div>
+        </el-tab-pane>
+      </el-tabs>
 
       <div class="page-card">
         <h3 class="page-title">使用说明</h3>
@@ -158,6 +190,12 @@ const scrollRef = ref<HTMLElement>();
 const ov = ref<any>({});
 const categories = ref<any[]>([]);
 const provider = ref('');
+const sideTab = ref('sug');
+const histList = ref<any[]>([]);
+const histLoading = ref(false);
+const histPage = ref(1);
+const histSize = ref(10);
+const histTotal = ref(0);
 
 const providerText = computed(() => (provider.value === 'mock' ? '规则引擎' : 'OpenClaw'));
 
@@ -236,7 +274,34 @@ onMounted(async () => {
   } catch {
     ov.value = {};
   }
+  loadHistory();
 });
+
+async function loadHistory() {
+  histLoading.value = true;
+  try {
+    const res: any = await kbApi.chatHistory({ page: histPage.value, size: histSize.value });
+    histList.value = (res.list || []).map((h: any) => ({ ...h, _read: false }));
+    histTotal.value = res.total || 0;
+  } catch {
+    histList.value = [];
+    histTotal.value = 0;
+  } finally {
+    histLoading.value = false;
+  }
+}
+
+function restoreSession(h: any) {
+  // 将历史会话的问答恢复到当前对话，并滚动到底部
+  messages.value.push({ role: 'user', content: h.question });
+  messages.value.push({
+    role: 'ai',
+    content: h.answer || '该条历史会话无回答记录',
+    refs: [],
+  });
+  sideTab.value = 'sug';
+  nextTick(scrollToBottom);
+}
 
 /* ---------- 工具 ---------- */
 function scorePct(s: any) {
@@ -452,6 +517,52 @@ function fmt(v: any) {
   padding-left: 18px;
   font-size: 13px;
   line-height: 2;
+}
+
+/* ---------- 侧边栏 Tabs 样式 ---------- */
+.side-tabs {
+  :deep(.el-tabs__header) {
+    margin: 0 0 12px;
+  }
+}
+
+.hist-list {
+  max-height: 320px;
+  overflow-y: auto;
+  padding: 4px 0;
+}
+
+.hist-item {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--fae-border);
+  cursor: pointer;
+  transition: background 0.15s;
+
+  &:hover {
+    background: var(--fae-primary-light);
+  }
+
+  .hist-q {
+    font-size: 13px;
+    line-height: 1.7;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+
+    &.bold {
+      font-weight: 600;
+    }
+  }
+
+  .hist-time {
+    margin-top: 4px;
+  }
+}
+
+.hist-pager {
+  padding: 8px 4px 4px;
+  border-top: 1px solid var(--fae-border);
 }
 
 .tiny {

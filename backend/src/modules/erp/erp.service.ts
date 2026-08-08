@@ -21,6 +21,7 @@ import { AuthUser } from '../../common/auth';
 import { LlmService } from '../../infra/llm/llm.service';
 import { Prompts } from '../../infra/llm/prompts';
 import { OrgService } from '../org/org.service';
+import { BizEvent, bizEvents } from '../../common/event-bus';
 
 @Injectable()
 export class ErpService {
@@ -512,12 +513,30 @@ export class ErpService {
       }
     }
 
+    const fromStatus = order.orderStatus;
     order.orderStatus = target;
     await this.orderRepo.save(order);
 
     // 完成：如归属人是合伙人，自动登记业绩台账（V1.0 只记台账，不发放）
     let performance: any = null;
     if (target === '已完成') performance = await this.recordPerformance(entId, order);
+
+    // ---- V2.0 事件广播：驱动生产工单联动、合伙人自动分利、智能体事件任务 ----
+    const payload = {
+      entId,
+      orderId: id,
+      orderNo: order.orderNo,
+      from: fromStatus,
+      status: target,
+      customerId: Number(order.customerId || 0),
+      ownerUserId: Number(order.ownerUserId || 0),
+    };
+    // 所有状态变更都广播（合伙人分利监听「已完成」）
+    setImmediate(() => bizEvents.emit(BizEvent.ORDER_STATUS_CHANGED, payload));
+    // 待审核 -> 生产中 视为「审核通过」，驱动生产工单自动生成
+    if (fromStatus === '待审核' && target === '生产中') {
+      setImmediate(() => bizEvents.emit(BizEvent.ORDER_APPROVED, payload));
+    }
 
     return { id, order_status: target, performance };
   }

@@ -58,6 +58,11 @@ export const kbApi = {
   qa: (data: any) => req.post('/v1/kb/qa', data),
   overview: () => req.get('/v1/kb/overview'),
   remove: (id: number) => req.delete(`/v1/kb/doc/${id}`),
+
+  // V2.0 知识库增强：文档版本快照 / 恢复 / 问答会话历史
+  versionList: (docId: number) => req.get('/v1/kb/doc/version/list', { params: { doc_id: docId } }),
+  versionRecover: (data: any) => req.post('/v1/kb/doc/version/recover', data),
+  chatHistory: (params: any) => req.get('/v1/kb/chat/history/page', { params }),
 };
 
 /** CRM */
@@ -121,7 +126,87 @@ export const partnerApi = {
   handleRisk: (data: any) => req.post('/v1/partner/risk/handle', data),
   scanRisk: () => req.post('/v1/partner/risk/scan'),
   overview: () => req.get('/v1/partner/overview'),
+
+  // V2.0 全自动分利核算：规则 + 结算流水
+  saveRule: (data: any) => req.post('/v1/partner/rule/save', data),
+  rulePage: (params: any) => req.get('/v1/partner/rule/page', { params }),
+  settlePage: (params: any) => req.get('/v1/partner/settle/page', { params }),
+  settleManual: (data: any) => req.post('/v1/partner/settle/manual', data),
+  settleExport: (params: any) => req.get('/v1/partner/settle/export', { params }),
 };
+
+/** V2.0 OpenClaw 智能体自动化引擎 */
+export const agentApi = {
+  templates: () => req.get('/v1/agent/template/list'),
+  saveTask: (data: any) => req.post('/v1/agent/task/save', data),
+  taskPage: (params: any) => req.get('/v1/agent/task/page', { params }),
+  enableTask: (data: any) => req.post('/v1/agent/task/enable', data),
+  logPage: (params: any) => req.get('/v1/agent/log/page', { params }),
+  manualRun: (taskId: number) => req.post('/v1/agent/manual_run', { task_id: taskId }),
+};
+
+/** V2.0 简易生产工单 */
+export const prodApi = {
+  saveWorkorder: (data: any) => req.post('/v1/prod/workorder/save', data),
+  workorderPage: (params: any) => req.get('/v1/prod/workorder/page', { params }),
+  updateStatus: (data: any) => req.put('/v1/prod/workorder/status', data),
+  stockIn: (data: any) => req.post('/v1/prod/workorder/stock_in', data),
+  aiTip: (workorderId: number) => req.get('/v1/prod/workorder/ai_tip', { params: { workorder_id: workorderId } }),
+};
+
+/** V2.0 站内消息通知 */
+export const noticeApi = {
+  page: (params: any) => req.get('/v1/notice/page', { params }),
+  unreadCount: () => req.get('/v1/notice/unread/count'),
+  read: (id: number) => req.put('/v1/notice/read', { notice_id: id }),
+  readAll: () => req.put('/v1/notice/read_all'),
+};
+
+/** V2.0 批量导入导出（客户/订单/工单/知识库） */
+export const commonApi = {
+  customerTemplate: () => req.get('/v1/common/template/customer'),
+  importCustomer: (data: any) => req.post('/v1/common/import/customer', data),
+  exportCustomer: (params: any) => req.get('/v1/common/export/customer', { params }),
+  importKb: (data: any) => req.post('/v1/common/import/kb', data),
+  exportOrder: (params: any) => req.get('/v1/common/export/order', { params }),
+  exportWorkorder: (params: any) => req.get('/v1/common/export/workorder', { params }),
+};
+
+/**
+ * 后端导入导出统一返回 { file_name, file_base64 }，这里统一转成浏览器下载。
+ * 放在 api 层是因为 6 个视图都要用，避免各写一份 base64 解码逻辑。
+ */
+export function downloadBase64(res: any) {
+  const fileName = res?.file_name || `导出_${Date.now()}.xlsx`;
+  const b64 = res?.file_base64;
+  if (!b64) return false;
+  const bin = atob(b64);
+  const buf = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
+  const blob = new Blob([buf], { type: 'application/octet-stream' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = fileName;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  return true;
+}
+
+/** 读取本地文件为 base64（去掉 dataURL 前缀），供批量导入使用 */
+export function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const r = String(reader.result || '');
+      resolve(r.includes(',') ? r.split(',')[1] : r);
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
 
 /** 系统设置 */
 export const systemApi = {

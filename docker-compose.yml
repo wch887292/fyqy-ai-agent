@@ -1,5 +1,5 @@
 # ==========================================================
-# 飞虹智-企业AI一站式平台 V1.0 生产编排
+# 飞虹智-企业AI一站式平台 V2.0 生产编排
 # 研发主体：晋江市飞虹智科技企业管理有限公司 · 飞扬企源研发中心
 # 项目负责人：吴赐虹
 #
@@ -139,14 +139,14 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    image: fae/backend:1.0.0
+    image: fae/backend:2.0.0
     container_name: fae-backend
     restart: unless-stopped
     environment:
       TZ: Asia/Shanghai
       APP_MODE: prod
       APP_PORT: "8080"
-      APP_NAME: 飞虹智-企业AI一站式平台
+      APP_NAME: 飞虹智-企业AI一站式平台 V2.0
 
       JWT_SECRET: ${JWT_SECRET:-fae-feihongzhi-2026-change-me-in-production}
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-12h}
@@ -158,6 +158,9 @@ services:
       DB_PASSWORD: ${DB_PASSWORD:-Root@123456}
       DB_NAME: ${DB_NAME:-fae_enterprise}
       # init.sql 已建表，生产环境关闭自动同步，避免结构被意外改写
+      # V2.0 升级：在 01-init.sql 执行后再追加 02-v2_alter.sql
+      - ./deploy/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+      - ./deploy/v2_alter.sql:/docker-entrypoint-initdb.d/02-v2_alter.sql:ro
       DB_SYNCHRONIZE: "false"
 
       VECTOR_DRIVER: milvus
@@ -201,7 +204,7 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-    image: fae/frontend:1.0.0
+    image: fae/frontend:2.0.0
     container_name: fae-frontend
     restart: unless-stopped
     environment:

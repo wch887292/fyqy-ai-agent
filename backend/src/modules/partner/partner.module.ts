@@ -8,10 +8,13 @@ import {
   PartnerConfig,
   PartnerPerformance,
   PartnerRisk,
+  PartnerSettleFlow,
+  PartnerSettleRule,
   SysUser,
 } from '../../entities';
 import { PartnerService } from './partner.service';
 import { PartnerController } from './partner.controller';
+import { NoticeModule } from '../notice/notice.module';
 
 @Module({
   imports: [
@@ -19,12 +22,15 @@ import { PartnerController } from './partner.controller';
       PartnerConfig,
       PartnerPerformance,
       PartnerRisk,
+      PartnerSettleRule,
+      PartnerSettleFlow,
       SysUser,
       CrmCustomer,
       ErpOrder,
       ErpStockWarn,
       Enterprise,
     ]),
+    NoticeModule,
   ],
   providers: [PartnerService],
   controllers: [PartnerController],

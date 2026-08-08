@@ -114,3 +114,90 @@ export class PartnerRisk {
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 }
+
+/**
+ * 合伙人分利规则配置（V2.0 全自动分利）
+ * 每个合伙人可配置按订单 / 按业绩两种分成模式
+ */
+@Entity('partner_settle_rule')
+@Index('idx_ent_user_type', ['enterpriseId', 'userId', 'settleType'])
+export class PartnerSettleRule {
+  @PrimaryGeneratedColumn({ type: T.pk })
+  id: number;
+
+  @Column({ name: 'enterprise_id', ...bigintCol(false) })
+  enterpriseId: number;
+
+  @Column({ name: 'user_id', ...bigintCol(false) })
+  userId: number;
+
+  /** order按订单 / performance按业绩 */
+  @Column({ name: 'settle_type', length: 32 })
+  settleType: string;
+
+  /** 分成比例 % */
+  @Column({ name: 'ratio', ...ratioCol() })
+  ratio: number;
+
+  /** 结算条件 JSON：如 {"order_status":"已完成"} */
+  @Column({ name: 'settle_condition', type: T.text, nullable: true })
+  settleCondition: string;
+
+  @Column({ type: 'tinyint', default: 1 })
+  enable: number;
+
+  @CreateDateColumn({ name: 'created_at' })
+  createdAt: Date;
+}
+
+/** 合伙人分利结算流水（V2.0） */
+@Entity('partner_settle_flow')
+@Index('idx_ent_uid', ['enterpriseId', 'userId'])
+export class PartnerSettleFlow {
+  @PrimaryGeneratedColumn({ type: T.pk })
+  id: number;
+
+  @Column({ name: 'enterprise_id', ...bigintCol(false) })
+  enterpriseId: number;
+
+  @Column({ name: 'user_id', ...bigintCol(false) })
+  userId: number;
+
+  @Column({ name: 'order_id', ...bigintCol() })
+  orderId: number;
+
+  @Column({ name: 'performance_id', ...bigintCol() })
+  performanceId: number;
+
+  /**
+   * 结算模式：order 按订单 / performance 按业绩
+   * 设计文档 DDL 未列该列，实现时补上：一个合伙人可能同时配了两种规则，
+   * 幂等去重与对账单「结算模式」列都需要区分来源，否则会重复核算。
+   */
+  @Column({ name: 'settle_type', length: 32, default: 'order' })
+  settleType: string;
+
+  /** 计算基数金额 */
+  @Column({ name: 'base_amount', ...moneyCol() })
+  baseAmount: number;
+
+  /** 应结算分成金额 */
+  @Column({ name: 'settle_amount', ...moneyCol() })
+  settleAmount: number;
+
+  /** pending待结算 / settled已结算 / cancel作废 */
+  @Column({ name: 'status', length: 32, default: 'pending' })
+  status: string;
+
+  @Column({ name: 'settle_time', type: T.datetime, nullable: true })
+  settleTime: Date;
+
+  @Column({ type: T.text, nullable: true })
+  remark: string;
+
+  @Column({ name: 'created_by', ...bigintCol() })
+  createdBy: number;
+
+  @CreateDateColumn({ name: 'created_at' })
+  createdAt: Date;
+}

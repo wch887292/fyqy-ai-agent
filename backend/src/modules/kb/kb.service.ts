@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { KB_CATEGORIES, KbChunk, KbDocument, SysUser } from '../../entities';
+import { KB_CATEGORIES, KbChunk, KbChatHistory, KbDocVersion, KbDocument, SysUser } from '../../entities';
 import { pageResult } from '../../common/result';
 import { parsePage } from '../../common/scope';
 import { AuthUser } from '../../common/auth';
@@ -19,6 +19,8 @@ export class KbService {
   constructor(
     @InjectRepository(KbDocument) private readonly docRepo: Repository<KbDocument>,
     @InjectRepository(KbChunk) private readonly chunkRepo: Repository<KbChunk>,
+    @InjectRepository(KbDocVersion) private readonly verRepo: Repository<KbDocVersion>,
+    @InjectRepository(KbChatHistory) private readonly chatRepo: Repository<KbChatHistory>,
     @InjectRepository(SysUser) private readonly userRepo: Repository<SysUser>,
     private readonly ai: AiService,
     private readonly storage: StorageService,
@@ -243,7 +245,91 @@ export class KbService {
             : permTargets,
     });
     await this.docRepo.save(doc);
+    // 修改即存一版历史版本（V2.0 知识库版本管理）
+    await this.snapshotVersion(entId, Number(id), doc, Number(dto.updated_by ?? dto.updatedBy ?? 0));
     return { id };
+  }
+
+  /** 保存文档历史版本快照 */
+  private async snapshotVersion(entId: number, docId: number, doc: KbDocument, userId: number) {
+    const last = await this.verRepo
+      .createQueryBuilder('v')
+      .where('v.enterpriseId = :entId AND v.docId = :docId', { entId, docId })
+      .orderBy('v.versionNo', 'DESC')
+      .getOne();
+    const versionNo = (last?.versionNo || 0) + 1;
+    await this.verRepo.save(
+      this.verRepo.create({
+        enterpriseId: entId,
+        docId,
+        versionNo,
+        title: doc.title,
+        content: doc.content,
+        summary: doc.summary,
+        tagList: doc.tagList,
+        createdBy: userId,
+      }),
+    );
+  }
+
+  /** V2.0 文档历史版本列表 */
+  async versionList(entId: number, docId: number) {
+    const list = await this.verRepo.find({
+      where: { enterpriseId: entId, docId },
+      order: { versionNo: 'DESC' },
+    });
+    return list.map((v) => ({
+      id: Number(v.id),
+      version_no: v.versionNo,
+      title: v.title,
+      summary: v.summary,
+      tag_list: v.tagList,
+      created_by: Number(v.createdBy),
+      created_at: v.createdAt,
+    }));
+  }
+
+  /** V2.0 恢复指定历史版本 */
+  async recoverVersion(entId: number, user: AuthUser, versionId: number) {
+    const v = await this.verRepo.findOne({ where: { id: versionId, enterpriseId: entId } });
+    if (!v) throw new NotFoundException('版本不存在');
+    const doc = await this.docRepo.findOne({ where: { id: v.docId, enterpriseId: entId } });
+    if (!doc) throw new NotFoundException('文档不存在');
+    const oldTitle = doc.title;
+    doc.title = v.title;
+    doc.content = v.content;
+    doc.summary = v.summary;
+    doc.tagList = v.tagList;
+    await this.docRepo.save(doc);
+    // 恢复动作本身也记为新版本，保证可追溯
+    await this.snapshotVersion(entId, v.docId, doc, user.userId);
+    return { id: Number(doc.id), recovered_from_version: v.versionNo, previous_title: oldTitle };
+  }
+
+  /** V2.0 知识库问答会话历史分页 */
+  async chatHistoryPage(entId: number, user: AuthUser, query: any) {
+    const { page, size, skip, take } = parsePage(query);
+    const qb = this.chatRepo
+      .createQueryBuilder('c')
+      .where('c.enterpriseId = :entId', { entId });
+    // 非超管默认只看自己的会话
+    if (!user.isSuper) qb.andWhere('c.userId = :uid', { uid: user.userId });
+    if (query.keyword) qb.andWhere('c.question LIKE :kw', { kw: `%${query.keyword}%` });
+    qb.orderBy('c.createdAt', 'DESC');
+    const [list, total] = await qb.skip(skip).take(take).getManyAndCount();
+    return pageResult(
+      list.map((c) => ({
+        id: Number(c.id),
+        user_id: Number(c.userId),
+        question: c.question,
+        answer: c.answer,
+        ref_docs: c.refDocs,
+        created_at: c.createdAt,
+      })),
+      total,
+      page,
+      size,
+    );
   }
 
   /** DELETE /api/v1/kb/doc/:id 删除文档（连同切片、向量、物理文件） */

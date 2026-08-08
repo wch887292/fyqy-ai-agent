@@ -136,6 +136,42 @@ export const routes: RouteRecordRaw[] = [
         component: () => import('../views/partner/risk.vue'),
         meta: { code: 'partner:risk', title: '风险预警记录' },
       },
+      {
+        path: 'partner/rule',
+        component: () => import('../views/partner/rule.vue'),
+        meta: { code: 'partner:rule', title: '分利规则配置' },
+      },
+      {
+        path: 'partner/settle',
+        component: () => import('../views/partner/settle.vue'),
+        meta: { code: 'partner:settle', title: '分利结算流水' },
+      },
+
+      // ============ 模块八：智能体自动化（V2.0） ============
+      {
+        path: 'agent/task',
+        component: () => import('../views/agent/task.vue'),
+        meta: { code: 'agent:task', title: '智能体任务' },
+      },
+      {
+        path: 'agent/log',
+        component: () => import('../views/agent/log.vue'),
+        meta: { code: 'agent:log', title: '智能体执行日志' },
+      },
+
+      // ============ 模块九：简易生产管理（V2.0） ============
+      {
+        path: 'prod/workorder',
+        component: () => import('../views/prod/workorder.vue'),
+        meta: { code: 'prod:workorder', title: '生产工单' },
+      },
+
+      // ============ 站内消息（全局收件箱，无需菜单权限） ============
+      {
+        path: 'notice/index',
+        component: () => import('../views/notice/index.vue'),
+        meta: { title: '消息中心', skipAuth: true },
+      },
 
       // ============ 模块七：系统设置 ============
       {

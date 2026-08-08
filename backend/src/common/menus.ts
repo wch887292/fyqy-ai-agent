@@ -72,14 +72,33 @@ export const MENU_TREE: MenuNode[] = [
     ],
   },
   {
+    code: 'prod',
+    name: '生产管理',
+    path: '/prod',
+    icon: 'Tools',
+    children: [{ code: 'prod:workorder', name: '生产工单', path: '/prod/workorder' }],
+  },
+  {
     code: 'partner',
     name: '合伙人管理',
     path: '/partner',
     icon: 'Share',
     children: [
       { code: 'partner:config', name: '分权配置', path: '/partner/config' },
+      { code: 'partner:rule', name: '分利规则配置', path: '/partner/rule' },
       { code: 'partner:performance', name: '业绩归属台账', path: '/partner/performance' },
+      { code: 'partner:settle', name: '结算流水', path: '/partner/settle' },
       { code: 'partner:risk', name: '风险预警记录', path: '/partner/risk' },
+    ],
+  },
+  {
+    code: 'agent',
+    name: '智能体工作台',
+    path: '/agent',
+    icon: 'MagicStick',
+    children: [
+      { code: 'agent:task', name: '智能体任务', path: '/agent/task' },
+      { code: 'agent:log', name: '执行日志', path: '/agent/log' },
     ],
   },
   {
@@ -149,5 +168,19 @@ export const PARTNER_MENU_CODES = [
   ...SALES_MENU_CODES,
   'partner',
   'partner:performance',
+  // V2.0：合伙人可查看自己的结算流水（Service 层限制只看本人）
+  'partner:settle',
   'partner:risk',
+];
+
+/** 生产岗默认菜单（V2.0 种子数据用） */
+export const PROD_MENU_CODES = [
+  'workbench',
+  'workbench:index',
+  'erp',
+  'erp:product',
+  'erp:stock',
+  'erp:order',
+  'prod',
+  'prod:workorder',
 ];

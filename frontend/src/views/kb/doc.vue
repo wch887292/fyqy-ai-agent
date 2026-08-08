@@ -128,6 +128,7 @@
               重新向量化
             </el-button>
             <el-button link type="primary" size="small" @click="openEdit(row)">编辑</el-button>
+            <el-button link type="info" size="small" @click="openVersionList(row)">历史版本</el-button>
             <el-button link type="danger" size="small" @click="doRemove(row)">删除</el-button>
           </template>
         </el-table-column>
@@ -248,6 +249,33 @@
         <el-button type="primary" :loading="saving" @click="submit">保存</el-button>
       </template>
     </el-dialog>
+
+    <!-- 历史版本列表 -->
+    <el-drawer v-model="verVisible" title="历史版本" size="560px">
+      <div v-if="verDoc">
+        <div class="d-head mb-8">
+          <div>
+            <h3 class="d-name">{{ verDoc.title }}</h3>
+            <p class="text-sub">当前共 {{ verList.length }} 个版本快照</p>
+          </div>
+        </div>
+        <el-divider />
+        <div v-loading="verLoading">
+          <div v-if="!verList.length" class="empty-tip">该文档暂无历史版本</div>
+          <div v-for="v in verList" :key="v.id" class="ver-card">
+            <div class="ver-head">
+              <el-tag size="small" effect="dark">v{{ v.version_no }}</el-tag>
+              <span class="ver-time">{{ fmt(v.created_at) }}</span>
+              <span class="ver-by text-sub tiny">创建人 #{{ v.created_by }}</span>
+            </div>
+            <div class="ver-summary text-sub tiny mt-4">{{ v.summary || '（无摘要）' }}</div>
+            <div class="ver-actions mt-8">
+              <el-button link type="primary" size="small" @click="doRecover(v)">恢复到本版本</el-button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </el-drawer>
   </div>
 </template>
 
@@ -419,6 +447,40 @@ function doRemove(row: any) {
     .catch(() => void 0);
 }
 
+/* ---------- 历史版本 ---------- */
+const verVisible = ref(false);
+const verList = ref<any[]>([]);
+const verLoading = ref(false);
+const verDoc = ref<any>(null);
+
+async function openVersionList(row: any) {
+  verDoc.value = row;
+  verList.value = [];
+  verVisible.value = true;
+  verLoading.value = true;
+  try {
+    const res: any = await kbApi.versionList(row.id);
+    verList.value = Array.isArray(res) ? res : [];
+  } catch (e: any) {
+    // 全局拦截
+  } finally {
+    verLoading.value = false;
+  }
+}
+
+async function doRecover(row: any) {
+  if (!verDoc.value) return;
+  await ElMessageBox.confirm(`确定恢复到版本 ${row.version_no} 吗？当前内容将被覆盖并生成新版本快照。`, '恢复确认', { type: 'warning' });
+  try {
+    await kbApi.versionRecover({ doc_id: verDoc.value.id, version_id: row.id });
+    ElMessage.success('已恢复到历史版本');
+    verVisible.value = false;
+    loadAll();
+  } catch (e: any) {
+    // 全局拦截
+  }
+}
+
 /* ---------- 工具 ---------- */
 function vecType(s: number) {
   return s === 1 ? 'success' : s === 2 ? 'danger' : 'warning';
@@ -549,5 +611,44 @@ function fmt(v: any) {
   line-height: 1.9;
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+/* V2.0 历史版本卡片 */
+.ver-card {
+  background: #fafbfc;
+  border-radius: 8px;
+  padding: 12px 14px;
+  margin-bottom: 10px;
+  border: 1px solid #ebeef5;
+}
+
+.ver-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ver-time {
+  font-size: 13px;
+  color: #606266;
+}
+
+.ver-by {
+  margin-left: auto;
+}
+
+.ver-summary {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ver-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.mb-8 {
+  margin-bottom: 8px;
 }
 </style>

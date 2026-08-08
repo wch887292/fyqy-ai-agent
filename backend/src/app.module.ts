@@ -23,11 +23,21 @@ import { PartnerModule } from './modules/partner/partner.module';
 import { SystemModule } from './modules/system/system.module';
 import { WorkbenchModule } from './modules/workbench/workbench.module';
 import { SeedModule } from './modules/seed/seed.module';
+// V2.0 新增模块
+import { AgentModule } from './modules/agent/agent.module';
+import { ProdModule } from './modules/prod/prod.module';
+import { NoticeModule } from './modules/notice/notice.module';
+import { CommonBizModule } from './modules/common/common.module';
 
 /**
  * 应用主模块
- * 飞虹智-企业AI一站式平台 V1.0
+ * 飞虹智-企业AI一站式平台 V2.0
  * 晋江市飞虹智科技企业管理有限公司 · 飞扬企源研发中心
+ *
+ * V2.0 在 V1.0 之上以「单进程 monolith + 进程内事件总线」承载两个逻辑服务：
+ *   agent-scheduler -> AgentRunnerService（@Interval 每分钟扫描 cron 任务）
+ *   notify-service  -> NoticeService（各模块 exports 复用，站内消息统一出口）
+ * 生产环境如需拆分，可用同一镜像通过环境变量只启用对应 Runner，无需改代码结构。
  *
  * 数据库连接按 DB_DRIVER 自适应：
  *   sqlite -> 本地文件，开箱即用，用于开发与轻量演示
@@ -95,6 +105,12 @@ import { SeedModule } from './modules/seed/seed.module';
     SystemModule,
     WorkbenchModule,
     SeedModule,
+
+    // ---- V2.0：智能体引擎 / 生产工单 / 站内消息 / 批量导入导出 ----
+    AgentModule,
+    ProdModule,
+    NoticeModule,
+    CommonBizModule,
   ],
   providers: [
     // 全局鉴权 + 租户隔离

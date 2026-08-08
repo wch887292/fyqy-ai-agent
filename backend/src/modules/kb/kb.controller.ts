@@ -78,4 +78,25 @@ export class KbController {
   remove(@TenantId() entId: number, @Param('id') id: string) {
     return this.svc.remove(entId, parseIntId(id, '文档ID'));
   }
+
+  /** GET /api/v1/kb/doc/version/list 文档历史版本列表 */
+  @Get('doc/version/list')
+  @RequireMenu('kb:doc')
+  versionList(@TenantId() entId: number, @Query('doc_id') docId: string) {
+    return this.svc.versionList(entId, parseIntId(docId, '文档ID'));
+  }
+
+  /** POST /api/v1/kb/doc/version/recover 恢复历史版本 */
+  @Post('doc/version/recover')
+  @RequireMenu('kb:doc')
+  recoverVersion(@TenantId() entId: number, @CurrentUser() user: AuthUser, @Body() body: any) {
+    return this.svc.recoverVersion(entId, user, parseIntId(body.version_id ?? body.versionId, '版本ID'));
+  }
+
+  /** GET /api/v1/kb/chat/history/page 问答会话历史 */
+  @Get('chat/history/page')
+  @RequireMenu('kb:qa')
+  chatHistory(@TenantId() entId: number, @CurrentUser() user: AuthUser, @Query() query: any) {
+    return this.svc.chatHistoryPage(entId, user, query);
+  }
 }

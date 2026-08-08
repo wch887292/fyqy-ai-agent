@@ -11,14 +11,30 @@ import {
   PartnerConfig,
   PartnerPerformance,
   PartnerRisk,
+  PartnerSettleFlow,
+  PartnerSettleRule,
   SysUser,
 } from '../../entities';
-import { pageResult } from '../../common/result';
+import { pageResult, toSnake } from '../../common/result';
 import { parsePage, todayStr } from '../../common/scope';
 import { AuthUser } from '../../common/auth';
 import { LlmService } from '../../infra/llm/llm.service';
 import { Prompts } from '../../infra/llm/prompts';
 import { ALL_MENU_CODES } from '../../common/menus';
+import { parseIntId } from '../../common/id.util';
+import { bizEvents, BizEvent } from '../../common/event-bus';
+import { NoticeService } from '../notice/notice.service';
+
+/**
+ * 结算条件入参归一化：
+ * 前端可能传对象 {min_amount:0}，也可能传已经序列化好的 JSON 字符串。
+ * 统一存为 JSON 字符串，避免字符串被二次 stringify 导致前端要 parse 两次。
+ */
+function normalizeCondition(dto: any): string | null {
+  const raw = dto.settle_condition ?? dto.settleCondition;
+  if (raw === undefined || raw === null || raw === '') return null;
+  return typeof raw === 'string' ? raw : JSON.stringify(raw);
+}
 
 /**
  * 合伙人管理服务
@@ -38,15 +54,24 @@ export class PartnerService {
     @InjectRepository(PartnerConfig) private readonly cfgRepo: Repository<PartnerConfig>,
     @InjectRepository(PartnerPerformance) private readonly perfRepo: Repository<PartnerPerformance>,
     @InjectRepository(PartnerRisk) private readonly riskRepo: Repository<PartnerRisk>,
+    @InjectRepository(PartnerSettleRule) private readonly ruleRepo: Repository<PartnerSettleRule>,
+    @InjectRepository(PartnerSettleFlow) private readonly flowRepo: Repository<PartnerSettleFlow>,
     @InjectRepository(SysUser) private readonly userRepo: Repository<SysUser>,
     @InjectRepository(CrmCustomer) private readonly custRepo: Repository<CrmCustomer>,
     @InjectRepository(ErpOrder) private readonly orderRepo: Repository<ErpOrder>,
     @InjectRepository(ErpStockWarn) private readonly warnRepo: Repository<ErpStockWarn>,
     @InjectRepository(Enterprise) private readonly entRepo: Repository<Enterprise>,
     private readonly llm: LlmService,
+    private readonly notice: NoticeService,
     cfg: ConfigService,
   ) {
     this.overdueDays = cfg.get('biz').followOverdueDays;
+    // 订单完成 -> 自动计算合伙人分成流水
+    bizEvents.on(BizEvent.ORDER_STATUS_CHANGED, (p: { entId: number; orderId: number; status: string }) =>
+      this.onOrderStatusChanged(p.entId, p.orderId, p.status).catch((e) =>
+        this.logger.warn(`订单分利自动核算失败: ${e?.message}`),
+      ),
+    );
   }
 
   // ==================== 分权 ====================
@@ -206,9 +231,11 @@ export class PartnerService {
       if (!row) throw new NotFoundException('台账记录不存在');
       Object.assign(row, data);
       await this.perfRepo.save(row);
+      await this.computeSettleForPerformance(entId, row);
       return { id, estimate_amount: data.estimateAmount };
     }
     const saved = await this.perfRepo.save(this.perfRepo.create({ enterpriseId: entId, ...data }));
+    await this.computeSettleForPerformance(entId, saved);
     return { id: Number(saved.id), estimate_amount: data.estimateAmount };
   }
 
@@ -277,6 +304,245 @@ export class PartnerService {
     if (!row) throw new NotFoundException('台账记录不存在');
     await this.perfRepo.delete(id);
     return true;
+  }
+
+  // ==================== 分利（V2.0 全自动核算）====================
+
+  /** 订单状态变更回调：完成后自动核算分成 */
+  async onOrderStatusChanged(entId: number, orderId: number, status: string) {
+    if (status !== '已完成') return; // 仅「已完成」触发结算
+    await this.computeSettleForOrder(entId, orderId);
+  }
+
+  /** 按订单自动核算分成，写入结算流水（幂等） */
+  async computeSettleForOrder(entId: number, orderId: number) {
+    const order = await this.orderRepo.findOne({ where: { id: orderId, enterpriseId: entId } });
+    if (!order) return;
+    const userId = Number(order.ownerUserId || 0);
+    if (!userId) return;
+    const rule = await this.ruleRepo.findOne({
+      where: { enterpriseId: entId, userId, settleType: 'order', enable: 1 },
+    });
+    if (!rule) return;
+    const exist = await this.flowRepo.findOne({
+      where: { enterpriseId: entId, userId, orderId, settleType: 'order' },
+    });
+    if (exist) return; // 已核算，避免重复
+    const base = Number(order.totalAmount || 0);
+    const settle = Number(((base * Number(rule.ratio)) / 100).toFixed(2));
+    const flow = this.flowRepo.create({
+      enterpriseId: entId,
+      userId,
+      orderId,
+      performanceId: 0,
+      settleType: 'order',
+      baseAmount: base,
+      settleAmount: settle,
+      status: 'pending',
+      createdBy: 0,
+      remark: `订单${order.orderNo}完成后自动核算`,
+    });
+    await this.flowRepo.save(flow);
+    const user = await this.userRepo.findOne({ where: { id: userId, enterpriseId: entId } });
+    await this.notice.send(
+      entId,
+      userId,
+      '分利结算待确认',
+      `订单${order.orderNo}已完成，按${Number(rule.ratio)}%比例计算您应结算分成 ¥${settle.toLocaleString('zh-CN', { minimumFractionDigits: 2 })}，请到「结算流水」确认。`,
+      'partner分利',
+      flow.id,
+    );
+    return flow;
+  }
+
+  /** 按业绩台账自动核算分成（模式B） */
+  async computeSettleForPerformance(entId: number, perf: PartnerPerformance) {
+    const userId = Number(perf.userId);
+    const rule = await this.ruleRepo.findOne({
+      where: { enterpriseId: entId, userId, settleType: 'performance', enable: 1 },
+    });
+    if (!rule) return;
+    const exist = await this.flowRepo.findOne({
+      where: { enterpriseId: entId, userId, performanceId: perf.id, settleType: 'performance' },
+    });
+    if (exist) return;
+    const base = Number(perf.performanceAmount || 0);
+    const settle = Number(((base * Number(rule.ratio)) / 100).toFixed(2));
+    const flow = this.flowRepo.create({
+      enterpriseId: entId,
+      userId,
+      orderId: Number(perf.orderId || 0),
+      performanceId: perf.id,
+      settleType: 'performance',
+      baseAmount: base,
+      settleAmount: settle,
+      status: 'pending',
+      createdBy: 0,
+      remark: `业绩台账自动核算`,
+    });
+    await this.flowRepo.save(flow);
+    return flow;
+  }
+
+  /** 分利规则保存（新增/编辑，按 user+type 唯一） */
+  async ruleSave(entId: number, dto: any) {
+    const userId = Number(dto.user_id ?? dto.userId);
+    if (!userId) throw new BadRequestException('请选择合伙人');
+    const settleType = dto.settle_type ?? dto.settleType;
+    if (!['order', 'performance'].includes(settleType)) throw new BadRequestException('结算模式不合法');
+    const ratio = Number(dto.ratio ?? 0);
+    if (ratio < 0 || ratio > 100) throw new BadRequestException('分成比例应在 0-100 之间');
+    const id = Number(dto.id || 0);
+    if (id) {
+      const rule = await this.ruleRepo.findOne({ where: { id, enterpriseId: entId } });
+      if (!rule) throw new NotFoundException('规则不存在');
+      Object.assign(rule, {
+        ratio,
+        settleCondition: normalizeCondition(dto) ?? rule.settleCondition,
+        enable: Number(dto.enable ?? rule.enable),
+      });
+      return toSnake(await this.ruleRepo.save(rule));
+    }
+    const exist = await this.ruleRepo.findOne({
+      where: { enterpriseId: entId, userId, settleType },
+    });
+    if (exist) throw new BadRequestException('该合伙人此结算模式的规则已存在，请编辑而非重复新增');
+    const rule = this.ruleRepo.create({
+      enterpriseId: entId,
+      userId,
+      settleType,
+      ratio,
+      settleCondition: normalizeCondition(dto),
+      enable: Number(dto.enable ?? 1),
+    });
+    return toSnake(await this.ruleRepo.save(rule));
+  }
+
+  /** 分利规则分页 */
+  async rulePage(entId: number, query: any) {
+    const { page, size, skip, take } = parsePage(query);
+    const qb = this.ruleRepo.createQueryBuilder('r').where('r.enterpriseId = :entId', { entId });
+    if (query.user_id) qb.andWhere('r.userId = :uid', { uid: Number(query.user_id) });
+    if (query.settle_type) qb.andWhere('r.settleType = :st', { st: query.settle_type });
+    qb.orderBy('r.id', 'DESC').skip(skip).take(take);
+    const [list, total] = await qb.getManyAndCount();
+    const uids = list.map((r) => Number(r.userId));
+    const users = uids.length
+      ? await this.userRepo.find({ where: { id: In(uids), enterpriseId: entId } })
+      : [];
+    const uMap = new Map(users.map((u) => [Number(u.id), u.realName || u.username]));
+    return pageResult(
+      list.map((r) => ({
+        id: Number(r.id),
+        user_id: Number(r.userId),
+        real_name: uMap.get(Number(r.userId)) || '',
+        settle_type: r.settleType,
+        settle_type_text: r.settleType === 'order' ? '按订单结算' : '按业绩结算',
+        ratio: Number(r.ratio),
+        settle_condition: r.settleCondition,
+        enable: r.enable,
+        created_at: r.createdAt,
+      })),
+      total,
+      page,
+      size,
+    );
+  }
+
+  /** 结算流水分页（合伙人仅看自己） */
+  async settlePage(entId: number, user: AuthUser, query: any) {
+    const { page, size, skip, take } = parsePage(query);
+    const qb = this.flowRepo
+      .createQueryBuilder('f')
+      .where('f.enterpriseId = :entId', { entId })
+      .orderBy('f.id', 'DESC')
+      .skip(skip)
+      .take(take);
+    if (query.user_id) qb.andWhere('f.userId = :uid', { uid: Number(query.user_id) });
+    if (query.status) qb.andWhere('f.status = :s', { s: query.status });
+    if (query.start_date) qb.andWhere('f.createdAt >= :sd', { sd: query.start_date });
+    if (query.end_date) qb.andWhere('f.createdAt <= :ed', { ed: query.end_date + ' 23:59:59' });
+    if (!user.isSuper && user.dataScope < 3 && user.isPartner) {
+      qb.andWhere('f.userId = :self', { self: user.userId });
+    }
+    const [list, total] = await qb.getManyAndCount();
+    const uids = [...new Set(list.map((f) => Number(f.userId)))];
+    const users = uids.length
+      ? await this.userRepo.find({ where: { id: In(uids), enterpriseId: entId } })
+      : [];
+    const uMap = new Map(users.map((u) => [Number(u.id), u.realName || u.username]));
+    return pageResult(
+      list.map((f) => ({
+        id: Number(f.id),
+        user_id: Number(f.userId),
+        real_name: uMap.get(Number(f.userId)) || '',
+        order_id: Number(f.orderId || 0),
+        performance_id: Number(f.performanceId || 0),
+        base_amount: Number(f.baseAmount),
+        settle_amount: Number(f.settleAmount),
+        settle_type: f.settleType,
+        status: f.status,
+        status_text: { pending: '待结算', settled: '已结算', cancel: '作废' }[f.status] || f.status,
+        settle_time: f.settleTime,
+        remark: f.remark,
+        created_at: f.createdAt,
+      })),
+      total,
+      page,
+      size,
+    );
+  }
+
+  /** 手动标记结算完成 */
+  async settleManual(entId: number, user: AuthUser, dto: any) {
+    const id = parseIntId(dto.settle_flow_id ?? dto.settleFlowId ?? dto.id, '结算流水ID');
+    const flow = await this.flowRepo.findOne({ where: { id, enterpriseId: entId } });
+    if (!flow) throw new NotFoundException('结算流水不存在');
+    flow.status = 'settled';
+    flow.settleTime = new Date();
+    flow.remark = dto.remark || flow.remark;
+    await this.flowRepo.save(flow);
+    await this.notice.send(
+      entId,
+      flow.userId,
+      '分利结算已确认',
+      `您的结算流水（金额 ¥${Number(flow.settleAmount).toLocaleString('zh-CN', { minimumFractionDigits: 2 })}）已标记为已结算。`,
+      'partner分利',
+      flow.id,
+    );
+    return { success: true };
+  }
+
+  /** 结算流水导出对账单数据 */
+  async settleExportRows(entId: number, user: AuthUser, query: any) {
+    const qb = this.flowRepo
+      .createQueryBuilder('f')
+      .where('f.enterpriseId = :entId', { entId })
+      .orderBy('f.id', 'DESC');
+    if (query.user_id) qb.andWhere('f.userId = :uid', { uid: Number(query.user_id) });
+    if (query.status) qb.andWhere('f.status = :s', { s: query.status });
+    if (query.start_date) qb.andWhere('f.createdAt >= :sd', { sd: query.start_date });
+    if (query.end_date) qb.andWhere('f.createdAt <= :ed', { ed: query.end_date + ' 23:59:59' });
+    if (!user.isSuper && user.dataScope < 3 && user.isPartner) {
+      qb.andWhere('f.userId = :self', { self: user.userId });
+    }
+    const list = await qb.getMany();
+    const uids = [...new Set(list.map((f) => Number(f.userId)))];
+    const users = uids.length
+      ? await this.userRepo.find({ where: { id: In(uids), enterpriseId: entId } })
+      : [];
+    const uMap = new Map(users.map((u) => [Number(u.id), u.realName || u.username]));
+    return list.map((f) => ({
+      合伙人: uMap.get(Number(f.userId)) || '',
+      关联订单ID: Number(f.orderId || 0),
+      计算基数: Number(f.baseAmount),
+      结算金额: Number(f.settleAmount),
+      结算模式: f.settleType === 'order' ? '按订单' : '按业绩',
+      状态: { pending: '待结算', settled: '已结算', cancel: '作废' }[f.status] || f.status,
+      结算时间: f.settleTime ? new Date(f.settleTime).toISOString().slice(0, 19) : '',
+      备注: f.remark || '',
+      生成时间: new Date(f.createdAt).toISOString().slice(0, 19),
+    }));
   }
 
   // ==================== 分风险 ====================
@@ -456,6 +722,43 @@ export class PartnerService {
       this.logger.log(`每日风险扫描完成，新增预警 ${total} 条，覆盖企业 ${ents.length} 家`);
     } catch (e: any) {
       this.logger.error(`每日风险扫描失败：${e.message}`);
+    }
+  }
+
+  /**
+   * 每日凌晨 2 点自动补算结算流水：
+   * 扫描所有「已完成」订单，若对应 enterprise + user + orderId 尚无线上结算记录，则触发 computeSettleForOrder 进行补算。
+   * 该函数幂等：computeSettleForOrder 内部已做 exist 检查，重复执行不会产生重复流水。
+   */
+  @Cron(CronExpression.EVERY_DAY_AT_2AM)
+  async cronSettleRecalc() {
+    try {
+      const ents = await this.entRepo.find({ where: { status: 1 } });
+      let total = 0;
+      for (const e of ents) {
+        const entId = Number(e.id);
+        // 查所有已完成但可能漏算的订单
+        const orders = await this.orderRepo.find({
+          where: { enterpriseId: entId, orderStatus: '已完成' },
+        });
+        for (const o of orders) {
+          const orderId = Number(o.id);
+          // 已存在结算流水则跳过（幂等保护）
+          const exist = await this.flowRepo.findOne({
+            where: { enterpriseId: entId, orderId, settleType: 'order' },
+          });
+          if (exist) continue;
+          try {
+            await this.computeSettleForOrder(entId, orderId);
+            total++;
+          } catch (err: any) {
+            this.logger.warn(`订单 ${orderId} 补算结算失败: ${err?.message}`);
+          }
+        }
+      }
+      this.logger.log(`每日结算补算完成，新产生流水 ${total} 条，覆盖企业 ${ents.length} 家`);
+    } catch (e: any) {
+      this.logger.error(`每日结算补算失败：${e.message}`);
     }
   }
 
