@@ -173,6 +173,21 @@ export const routes: RouteRecordRaw[] = [
         meta: { title: '消息中心', skipAuth: true },
       },
 
+      
+      // ============ 模块十：AI智能体搭建（V3.0） ============
+      {
+        path: 'agent/builder',
+        name: 'AgentBuilder',
+        component: () => import('../views/agent/builder.vue'),
+        meta: { code: 'agent:builder', title: 'AI智能体搭建' },
+        children: [
+          { path: '', redirect: 'simple' },
+          { path: 'simple', component: () => import('../views/agent/builder-simple.vue'), meta: { code: 'agent:builder:simple', title: '简易智能体' } },
+          { path: 'advanced', component: () => import('../views/agent/builder-advanced.vue'), meta: { code: 'agent:builder:advanced', title: '高级智能体' } },
+          { path: 'records', component: () => import('../views/agent/builder-records.vue'), meta: { code: 'agent:builder:records', title: '执行记录' } },
+        ],
+      },
+
       // ============ 模块七：系统设置 ============
       {
         path: 'system/enterprise',

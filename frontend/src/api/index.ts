@@ -230,3 +230,20 @@ export const workbenchApi = {
   shortcuts: () => req.get('/v1/workbench/shortcuts'),
   trend: () => req.get('/v1/workbench/trend'),
 };
+
+/** AI智能体搭建 */
+export const agentBuilderApi = {
+  kbDocs: (params?: any) => req.get('/v1/agent-builder/kb-docs', { params }),
+  simpleList: (params?: any) => req.get('/v1/agent-builder/simple/list', { params }),
+  simpleSave: (data: any) => req.post('/v1/agent-builder/simple/save', data),
+  simpleEnable: (data: any) => req.post('/v1/agent-builder/simple/enable', data),
+  simpleDelete: (id: number) => req.delete('/v1/agent-builder/simple/delete/' + id),
+  simpleChat: (id: number, data: any) => req.post('/v1/agent-builder/simple/chat/' + id, data),
+  advancedList: (params?: any) => req.get('/v1/agent-builder/advanced/list', { params }),
+  advancedSave: (data: any) => req.post('/v1/agent-builder/advanced/save', data),
+  advancedEnable: (data: any) => req.post('/v1/agent-builder/advanced/enable', data),
+  advancedDelete: (id: number) => req.delete('/v1/agent-builder/advanced/delete/' + id),
+  advancedNodes: (flowId: number) => req.get('/v1/agent-builder/advanced/nodes/' + flowId),
+  advancedChat: (id: number, data: any) => req.post('/v1/agent-builder/advanced/chat/' + id, data),
+  recordList: (params?: any) => req.get('/v1/agent-builder/record/list', { params }),
+};

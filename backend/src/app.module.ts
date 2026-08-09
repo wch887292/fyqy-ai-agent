@@ -28,6 +28,7 @@ import { AgentModule } from './modules/agent/agent.module';
 import { ProdModule } from './modules/prod/prod.module';
 import { NoticeModule } from './modules/notice/notice.module';
 import { CommonBizModule } from './modules/common/common.module';
+import { AgentBuilderModule } from "./modules/agent-builder/agent-builder.module";
 
 /**
  * 应用主模块
@@ -111,6 +112,7 @@ import { CommonBizModule } from './modules/common/common.module';
     ProdModule,
     NoticeModule,
     CommonBizModule,
+    AgentBuilderModule,
   ],
   providers: [
     // 全局鉴权 + 租户隔离

@@ -10,7 +10,7 @@ import {
   PartnerSettleFlow,
 } from './partner.entity';
 import { SysConfig, SysOperLog } from './system.entity';
-import { AgentTask, AgentExecLog } from './agent.entity';
+import { AgentTask, AgentExecLog, AgentSimple, AgentAdvanced, AgentAdvancedNode, AgentExecRecord } from './agent.entity';
 import { ProdWorkOrder } from './prod.entity';
 import { SysNotice } from './notice.entity';
 
@@ -51,6 +51,10 @@ export const ALL_ENTITIES = [
   SysOperLog,
   AgentTask,
   AgentExecLog,
+  AgentSimple,
+  AgentAdvanced,
+  AgentAdvancedNode,
+  AgentExecRecord,
   ProdWorkOrder,
   SysNotice,
 ];
