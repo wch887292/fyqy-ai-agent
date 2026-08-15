@@ -1,3 +1,5 @@
+> **English / 英文文档**：[README_EN.md](README_EN.md) · [FAQ (English)](FAQ_EN.md)
+
 # 飞虹智 · 企业AI一站式平台
 
 > 🏭 面向中小制造企业的 AI 原生一体化管理平台
